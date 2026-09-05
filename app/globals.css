@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Deep violet / near-black */
+  --background: #090510;
+  /* Off-white */
+  --foreground: #f8f7fb;
+  /* Electric purple / violet */
+  --accent: #9d4edd;
+  /* Lavender */
+  --secondary: #c8b6ff;
+  /* Low-opacity violet/white for borders */
+  --border: rgba(200, 182, 255, 0.15);
+}
+
+body {
+  color: var(--foreground);
+  background-color: var(--background);
+  /* Fonts will be applied via Next.js Font variables in layout */
+  font-family: var(--font-general-sans), sans-serif;
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Grain overlay utility */
+  .bg-grain {
+    position: relative;
+  }
+  .bg-grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  /* Restrained glow utilities */
+  .glow-accent {
+    box-shadow: 0 0 20px 0px rgba(157, 78, 221, 0.2);
+  }
+  
+  .glow-text-accent {
+    text-shadow: 0 0 15px rgba(157, 78, 221, 0.5);
+  }
+}
