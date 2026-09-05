@@ -14,6 +14,11 @@ const config: Config = {
         secondary: "var(--secondary)",
         border: "var(--border)",
       },
+      fontFamily: {
+        "clash-display": ["var(--font-clash-display)", "sans-serif"],
+        "general-sans": ["var(--font-general-sans)", "sans-serif"],
+        "jetbrains-mono": ["var(--font-jetbrains-mono)", "monospace"],
+      },
     },
   },
   plugins: [],
