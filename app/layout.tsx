@@ -4,6 +4,8 @@ import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ReducedMotionProvider } from "@/components/providers/reduced-motion-provider";
 import { LenisProvider } from "@/components/providers/lenis-provider";
+import { CustomCursor } from "@/components/ui/custom-cursor";
+import { Navbar } from "@/components/ui/navbar";
 
 const clashDisplay = localFont({
   src: "./fonts/ClashDisplay-Semibold.woff2",
@@ -40,6 +42,8 @@ export default function RootLayout({
       <body className="antialiased bg-grain bg-background text-foreground overflow-x-hidden min-h-screen">
         <ReducedMotionProvider>
           <LenisProvider>
+            <CustomCursor />
+            <Navbar />
             {children}
           </LenisProvider>
         </ReducedMotionProvider>
