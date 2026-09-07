@@ -87,7 +87,7 @@ export default function HeroModel() {
   }
 
   return (
-    <div className="hero-3d-container absolute inset-0 z-0 pointer-events-none opacity-0">
+    <div className="absolute inset-0 w-full h-full pointer-events-none">
       <Canvas
         camera={{ position: [0, 0, 5], fov: 45 }}
         gl={{ antialias: true, alpha: true }}
