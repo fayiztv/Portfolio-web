@@ -40,11 +40,25 @@ export function Hero() {
 
   useEffect(() => {
     if (!isReady || !pinRef.current) return;
-    if (prefersReducedMotion || isSkipped) {
-      // Jump to end state
-      gsap.set(".hero-element", { opacity: 1, y: 0 });
-      gsap.set(".hero-title-line", { opacity: 1, y: "0%" });
+    
+    if (prefersReducedMotion) {
+      gsap.to(".hero-title-line", { y: "0%", opacity: 1, duration: 1, stagger: 0.1 });
+      gsap.to(".hero-element", { opacity: 1, y: 0, duration: 1, stagger: 0.1 });
       gsap.set(".hero-3d-mask-container", { maskImage: "none", WebkitMaskImage: "none", opacity: 1 });
+      return;
+    }
+
+    if (isSkipped) {
+      // Play Prompt 3 original standalone entrance for repeat visitors
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+      gsap.set(".hero-3d-mask-container", { maskImage: "none", WebkitMaskImage: "none", opacity: 0 });
+      gsap.set(".hero-element", { y: 50, opacity: 0 });
+      gsap.set(".hero-title-line", { y: "120%", opacity: 0 });
+      gsap.set("header", { opacity: 1 });
+
+      tl.to(".hero-title-line", { y: "0%", opacity: 1, duration: 1.2, stagger: 0.15, ease: "expo.out" })
+        .to(".hero-element", { y: 0, opacity: 1, duration: 1, stagger: 0.1 }, "-=0.8")
+        .to(".hero-3d-mask-container", { opacity: 1, duration: 2, ease: "power2.inOut" }, "-=0.5");
       return;
     }
 
@@ -55,7 +69,7 @@ export function Hero() {
           trigger: pinRef.current,
           start: "top top",
           end: "+=5000", // 5000px of scrolling for the sequence
-          scrub: 1,
+          scrub: 1, // numeric scrub for smoother interpolation (especially for feTurbulence)
           pin: true,
           anticipatePin: 1,
         },
@@ -65,19 +79,13 @@ export function Hero() {
       gsap.set(".intro-layers-container", { opacity: 1 });
       gsap.set(".hero-element", { y: 50, opacity: 0 });
       gsap.set(".hero-title-line", { y: "120%", opacity: 0 });
-      gsap.set(".navbar", { opacity: 0 }); // Assuming navbar has this class or we fade it in layout... wait, navbar is global. 
-      // We'll just fade the navbar element globally
       gsap.set("header", { opacity: 0 }); 
-
-      // Timeline Steps (percentages correspond to scroll progress roughly mapped to timeline duration)
 
       // Step 2 & 3: Pattern Reveal & Letter Morph (0-35%)
       if (!isMobile) {
-        // Animate the turbulence frequency down to 0 to "settle" the pattern
         tl.to(".intro-turbulence", { attr: { baseFrequency: 0 }, duration: 2 }, 0);
       }
-      // Reveal the text holes by tracking letter spacing or just a slow scale/fade
-      tl.fromTo(".intro-text-group-pattern", { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.5 }, 0);
+      tl.fromTo(".intro-text-group-pattern", { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.5, transformOrigin: "50% 50%" }, 0);
 
       // Step 4: Wordmark Settles (35-45%)
       tl.to(".intro-pattern-layer", { opacity: 0, duration: 0.5 }, 2)
@@ -91,20 +99,18 @@ export function Hero() {
         .to(".intro-wipe-ribbon", { attr: { x: "100%" }, duration: 0.8, ease: "power2.inOut" }, 3.8);
 
       // Step 6: Visual Reveal Through Mask (55-65%)
-      // The 3D container is masked by #hero-canvas-mask. We just make sure it's visible.
-      // We fade out the intro border frame.
       tl.to(".intro-border-frame", { opacity: 0, duration: 0.5 }, 4.5);
 
       // Step 7: Mask Expands to Hero (65-80%)
       tl.to(".intro-text-group-canvas", {
-        scale: 40, // Massive scale to zoom through the hole
+        scale: 50, // Massive scale to zoom through the hole
+        transformOrigin: "50% 50%", // Explicit transform origin for SVG scale
         duration: 2.5,
         ease: "power3.in",
       }, 5)
       .to("header", { opacity: 1, duration: 1 }, 6); // Navbar fades in
 
       // Step 8: Wordmark Fades Out (80-88%)
-      // By scaling massively, the mask is out of view. We can fade the entire mask container or just remove the mask.
       tl.set(".hero-3d-mask-container", { maskImage: "none", WebkitMaskImage: "none" }, 7.5)
         .set(".intro-layers-container", { opacity: 0 }, 7.5);
 
@@ -130,10 +136,13 @@ export function Hero() {
 
   const handleSkip = () => {
     sessionStorage.setItem("introSkipped", "true");
-    setIsSkipped(true);
-    setIsReady(true);
-    // ScrollTrigger will be killed and recreated immediately due to dependencies, jumping to static state
-    window.scrollTo(0, 0); 
+    
+    // Instead of forcing tl.progress(1) and breaking sync, we programmatically 
+    // scroll to the ScrollTrigger instance's actual end value, letting it drive naturally to 1.
+    const st = ScrollTrigger.getAll().find(t => t.pin === pinRef.current);
+    if (st) {
+      window.scrollTo({ top: st.end, behavior: "instant" });
+    }
   };
 
   return (

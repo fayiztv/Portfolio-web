@@ -90,7 +90,7 @@ export function IntroSequence({ onReady, isMobile }: IntroSequenceProps) {
             {/* Mask to cut "FAYIZ" out of the pattern (White = Keep pattern, Black = transparent hole) */}
             <mask id="pattern-text-mask">
               <rect width="100%" height="100%" fill="white" />
-              <g transform-origin="center" className="intro-text-group-pattern">
+              <g className="intro-text-group-pattern">
                 <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="font-clash-display font-semibold text-[15vw] md:text-[18vw]" fill="black">
                   FAYIZ
                 </text>
@@ -100,7 +100,7 @@ export function IntroSequence({ onReady, isMobile }: IntroSequenceProps) {
             {/* Mask to reveal the 3D Canvas (Black = hide canvas, White = show canvas through text) */}
             <mask id="hero-canvas-mask">
               <rect width="100%" height="100%" fill="black" />
-              <g transform-origin="center" className="intro-text-group-canvas">
+              <g className="intro-text-group-canvas">
                 <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="font-clash-display font-semibold text-[15vw] md:text-[18vw]" fill="white">
                   FAYIZ
                 </text>
@@ -122,7 +122,7 @@ export function IntroSequence({ onReady, isMobile }: IntroSequenceProps) {
           />
 
           {/* Layer: Solid Text (Step 4) */}
-          <g transform-origin="center" className="intro-text-group-solid opacity-0">
+          <g className="intro-text-group-solid opacity-0">
             <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="font-clash-display font-semibold text-[15vw] md:text-[18vw]" fill="var(--foreground)">
               FAYIZ
             </text>
