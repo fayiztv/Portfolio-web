@@ -12,16 +12,17 @@ const HeroModel = dynamic(() => import("../3d/hero-model"), {
 });
 
 export function Hero() {
+  const containerRef = useRef<HTMLDivElement>(null);
   const pinRef = useRef<HTMLElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [isSkipped, setIsSkipped] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
+  const [debugStage, setDebugStage] = useState("loading");
   const prefersReducedMotion = useReducedMotion();
   const [isMobile, setIsMobile] = useState(true);
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 768);
-    
-    // Check if previously skipped
     if (sessionStorage.getItem("introSkipped") === "true") {
       setIsSkipped(true);
       setIsReady(true);
@@ -29,7 +30,6 @@ export function Hero() {
   }, []);
 
   useEffect(() => {
-    // If not ready, we lock the scroll using body overflow
     if (!isReady && !prefersReducedMotion && !isSkipped) {
       document.body.style.overflow = "hidden";
     } else {
@@ -38,18 +38,56 @@ export function Hero() {
     return () => { document.body.style.overflow = ""; };
   }, [isReady, prefersReducedMotion, isSkipped]);
 
-  useEffect(() => {
-    if (!isReady || !pinRef.current) return;
-    
-    if (prefersReducedMotion) {
-      gsap.to(".hero-title-line", { y: "0%", opacity: 1, duration: 1, stagger: 0.1 });
-      gsap.to(".hero-element", { opacity: 1, y: 0, duration: 1, stagger: 0.1 });
-      gsap.set(".hero-3d-mask-container", { maskImage: "none", WebkitMaskImage: "none", opacity: 1 });
-      return;
-    }
+  const scrambleRef = useRef([false, false, false, false, false]);
 
-    if (isSkipped) {
-      // Play Prompt 3 original standalone entrance for repeat visitors
+  useEffect(() => {
+    // Scrambler Loop
+    const glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*";
+    const scrambleChars = ['F', 'A', 'Y', 'I', 'Z'];
+    let animationFrameId: number;
+    let lastTime = 0;
+
+    const loop = (time: number) => {
+      if (time - lastTime > 60) {
+        lastTime = time;
+        scrambleChars.forEach((char, i) => {
+          const node = document.getElementById(`scramble-char-${i}`);
+          if (!node) return;
+
+          if (scrambleRef.current[i]) {
+            if (node.textContent !== char) {
+              node.textContent = char;
+              node.setAttribute("class", "scramble-char font-clash-display font-semibold fill-foreground");
+              
+              node.style.fill = "var(--accent)";
+              node.style.filter = "drop-shadow(0 0 15px var(--accent))";
+              setTimeout(() => {
+                if (node) {
+                  node.style.fill = "var(--foreground)";
+                  node.style.filter = "none";
+                }
+              }, 150);
+            }
+          } else {
+            const randomGlyph = glyphs[Math.floor(Math.random() * glyphs.length)];
+            node.textContent = randomGlyph;
+            node.setAttribute("class", "scramble-char font-jetbrains-mono font-medium fill-secondary");
+          }
+        });
+      }
+      animationFrameId = requestAnimationFrame(loop);
+    };
+    animationFrameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
+
+  useEffect(() => {
+    if (!isReady || !pinRef.current || !containerRef.current) return;
+    
+    if (prefersReducedMotion || isSkipped) {
+      setDebugStage("released (skipped)");
+      setIsFinished(true);
+      
       const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
       gsap.set(".hero-3d-mask-container", { maskImage: "none", WebkitMaskImage: "none", opacity: 0 });
       gsap.set(".hero-element", { y: 50, opacity: 0 });
@@ -63,58 +101,72 @@ export function Hero() {
     }
 
     const ctx = gsap.context(() => {
-      // The timeline is scrubbed via scroll
+      setDebugStage("pinning active");
+      
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: pinRef.current,
           start: "top top",
-          end: "+=5000", // 5000px of scrolling for the sequence
-          scrub: 1, // numeric scrub for smoother interpolation (especially for feTurbulence)
+          end: "+=5000",
+          scrub: 1,
           pin: true,
           anticipatePin: 1,
+          onUpdate: (self) => {
+            const p = self.progress;
+            
+            if (p < 0.35) setDebugStage("scramble decode");
+            else if (p < 0.55) setDebugStage("light sweep");
+            else if (p < 0.65) setDebugStage("visual reveal");
+            else if (p < 0.80) setDebugStage("mask expand");
+            else if (p < 0.88) setDebugStage("wordmark fade");
+            else if (p < 1) setDebugStage("copy animate");
+            
+            if (p === 1) {
+              setDebugStage("released");
+              setIsFinished(true);
+            } else {
+              setIsFinished(false);
+            }
+
+            // Lock scramble letters sequentially (0% to 35%)
+            scrambleRef.current = [
+              p >= 0.07,
+              p >= 0.14,
+              p >= 0.21,
+              p >= 0.28,
+              p >= 0.35,
+            ];
+          }
         },
       });
 
-      // Prepare initial states
       gsap.set(".intro-layers-container", { opacity: 1 });
       gsap.set(".hero-element", { y: 50, opacity: 0 });
       gsap.set(".hero-title-line", { y: "120%", opacity: 0 });
       gsap.set("header", { opacity: 0 }); 
 
-      // Step 2 & 3: Pattern Reveal & Letter Morph (0-35%)
-      if (!isMobile) {
-        tl.to(".intro-turbulence", { attr: { baseFrequency: 0 }, duration: 2 }, 0);
-      }
-      tl.fromTo(".intro-text-group-pattern", { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.5, transformOrigin: "50% 50%" }, 0);
+      // 0 to 3: Holding phase while the scramble happens (mapped to 0-35% of scroll)
+      tl.to({}, { duration: 3 });
 
-      // Step 4: Wordmark Settles (35-45%)
-      tl.to(".intro-pattern-layer", { opacity: 0, duration: 0.5 }, 2)
-        .to(".intro-border-frame", { opacity: 1, duration: 0.5 }, 2)
-        .to(".intro-text-group-solid", { opacity: 1, duration: 0.5 }, 2);
+      // 3 to 4: The Soft Light Sweep (mapped to 35-55% roughly)
+      // Visual sweep crosses screen, mask wipes layer away revealing 3D underneath
+      tl.set(".intro-sweep-visual", { opacity: 1 }, 3)
+        .fromTo(".intro-sweep-mask-rect", { x: "-200%" }, { x: "100%", duration: 1, ease: "power2.inOut" }, 3)
+        .fromTo(".intro-sweep-visual", { x: "-100%" }, { x: "100%", duration: 1, ease: "power2.inOut" }, 3);
 
-      // Step 5: Wipe Transition (45-55%)
-      tl.to(".intro-wipe-ribbon", { attr: { x: "0%" }, duration: 0.8, ease: "power2.inOut" }, 3)
-        .set(".intro-text-group-solid", { opacity: 0 })
-        .set(".intro-bg-solid", { opacity: 0 })
-        .to(".intro-wipe-ribbon", { attr: { x: "100%" }, duration: 0.8, ease: "power2.inOut" }, 3.8);
-
-      // Step 6: Visual Reveal Through Mask (55-65%)
-      tl.to(".intro-border-frame", { opacity: 0, duration: 0.5 }, 4.5);
-
-      // Step 7: Mask Expands to Hero (65-80%)
+      // 5 to 7.5: Mask Expands to Hero
       tl.to(".intro-text-group-canvas", {
-        scale: 50, // Massive scale to zoom through the hole
-        transformOrigin: "50% 50%", // Explicit transform origin for SVG scale
+        scale: 50, 
+        transformOrigin: "50% 50%",
         duration: 2.5,
         ease: "power3.in",
       }, 5)
-      .to("header", { opacity: 1, duration: 1 }, 6); // Navbar fades in
+      .to("header", { opacity: 1, duration: 1 }, 6); 
 
-      // Step 8: Wordmark Fades Out (80-88%)
+      // 7.5 to 8.7: Clean up mask and Copy Reveal
       tl.set(".hero-3d-mask-container", { maskImage: "none", WebkitMaskImage: "none" }, 7.5)
         .set(".intro-layers-container", { opacity: 0 }, 7.5);
 
-      // Step 9: Copy Animates In (88-100%)
       tl.to(".hero-title-line", {
         y: "0%",
         opacity: 1,
@@ -129,7 +181,12 @@ export function Hero() {
         stagger: 0.1,
       }, 8);
 
-    }, pinRef);
+    }, containerRef);
+
+    document.fonts.ready.then(() => {
+      ScrollTrigger.refresh();
+      const st = ScrollTrigger.getAll().find(t => t.pin === pinRef.current);
+    });
 
     return () => ctx.revert();
   }, [isReady, prefersReducedMotion, isSkipped, isMobile]);
@@ -137,22 +194,26 @@ export function Hero() {
   const handleSkip = () => {
     sessionStorage.setItem("introSkipped", "true");
     
-    // Instead of forcing tl.progress(1) and breaking sync, we programmatically 
-    // scroll to the ScrollTrigger instance's actual end value, letting it drive naturally to 1.
+    // Always refresh before reading st.end to ensure we don't jump to a stale target
+    ScrollTrigger.refresh();
     const st = ScrollTrigger.getAll().find(t => t.pin === pinRef.current);
     if (st) {
+      console.log("Skipping to exact ST End:", st.end);
       window.scrollTo({ top: st.end, behavior: "instant" });
+    } else {
+      setIsSkipped(true);
+      setIsReady(true);
     }
   };
 
   return (
-    <>
+    <div ref={containerRef} className="w-full">
       {(!isSkipped && !prefersReducedMotion) && (
-        <IntroSequence onReady={() => setIsReady(true)} isMobile={isMobile} />
+        <IntroSequence onReady={() => setIsReady(true)} isMobile={isMobile} debugState={debugStage} />
       )}
       
-      {/* Skip Button */}
-      {(!isSkipped && !prefersReducedMotion && isReady) && (
+      {/* Skip Button - Only visible when intro is active and not finished */}
+      {(!isSkipped && !prefersReducedMotion && isReady && !isFinished) && (
         <button 
           onClick={handleSkip}
           className="fixed bottom-8 right-8 z-50 font-jetbrains-mono text-xs uppercase tracking-widest text-secondary hover:text-accent transition-colors mix-blend-difference"
@@ -223,6 +284,6 @@ export function Hero() {
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }
