@@ -93,7 +93,7 @@ export const projects: Project[] = [
       "Real-time WebSocket messaging",
       "Production deployment pipeline on AWS EC2",
     ],
-    images: ["/placeholder-onmyway-1.jpg", "/placeholder-onmyway-2.jpg"],
+    images: [""],
     githubUrl: "https://github.com/fayiztv/om-way",
     liveUrl: "https://omway.netlify.app/",
     slug: "onmyway",
