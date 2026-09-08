@@ -6,9 +6,10 @@ import { useProgress } from "@react-three/drei";
 interface IntroSequenceProps {
   onReady: () => void;
   isMobile: boolean;
+  debugState?: string;
 }
 
-export function IntroSequence({ onReady, isMobile }: IntroSequenceProps) {
+export function IntroSequence({ onReady, isMobile, debugState }: IntroSequenceProps) {
   const { progress, active } = useProgress();
   const [displayProgress, setDisplayProgress] = useState(0);
   const [isReady, setIsReady] = useState(false);
@@ -20,20 +21,26 @@ export function IntroSequence({ onReady, isMobile }: IntroSequenceProps) {
     if (!isReady) {
       interval = setInterval(() => {
         setDisplayProgress(p => {
-          // If 3D canvas is still active loading, hold at 90%
+          // R3F useProgress can be inactive on mount before first request.
+          // We wait until p reaches 90. If active, we hold at 90.
           if (active && p >= 90) return 90;
-          // If R3F reports 100% or inactive (finished), go to 100%
-          if (!active || progress === 100) {
-            if (p >= 100) {
-              clearInterval(interval);
-              setIsReady(true);
-              onReady();
-              return 100;
-            }
-            return p + 5;
+          
+          if (!active && p >= 90 && progress === 100) {
+            // Wait until it actually reached 100 and no longer active
+            clearInterval(interval);
+            setIsReady(true);
+            onReady();
+            return 100;
           }
-          // Otherwise increment normally
-          return p + 2;
+          
+          if (p >= 100) {
+            clearInterval(interval);
+            setIsReady(true);
+            onReady();
+            return 100;
+          }
+
+          return p + 3;
         });
       }, 30);
     }
@@ -43,6 +50,11 @@ export function IntroSequence({ onReady, isMobile }: IntroSequenceProps) {
 
   return (
     <>
+      {/* DEBUG LABEL */}
+      <div className="fixed top-4 left-4 z-[999] bg-black text-white px-2 py-1 font-mono text-xs uppercase border border-red-500">
+        Stage: {debugState || "loading"} | R3F: {Math.round(progress)}% | Display: {Math.round(displayProgress)}%
+      </div>
+
       {/* 1. Loading State Gate */}
       {!isReady && (
         <div className="fixed inset-0 z-[100] bg-background flex items-center justify-center">
@@ -73,31 +85,27 @@ export function IntroSequence({ onReady, isMobile }: IntroSequenceProps) {
         {/* SVG Defs & Masking Engine */}
         <svg className="absolute inset-0 w-full h-full">
           <defs>
-            {/* Pattern (Step 2) */}
-            <pattern id="dash-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
-              <rect x="0" y="0" width="12" height="3" fill="var(--secondary)" opacity="0.3" rx="1.5" />
-              <rect x="20" y="20" width="12" height="3" fill="var(--secondary)" opacity="0.3" rx="1.5" />
-            </pattern>
+            {/* The Light Sweep Visual Gradient */}
+            <linearGradient id="sweep-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="transparent" />
+              <stop offset="50%" stopColor="var(--accent)" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="transparent" />
+            </linearGradient>
+            <filter id="sweep-blur">
+              <feGaussianBlur stdDeviation="30" />
+            </filter>
 
-            {/* Metaball / Liquid Filter (Step 3) - Only on Desktop */}
-            {!isMobile && (
-              <filter id="metaball">
-                <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="1" result="noise" className="intro-turbulence" />
-                <feDisplacementMap in="SourceGraphic" in2="noise" scale="30" xChannelSelector="R" yChannelSelector="G" />
-              </filter>
-            )}
-
-            {/* Mask to cut "FAYIZ" out of the pattern (White = Keep pattern, Black = transparent hole) */}
-            <mask id="pattern-text-mask">
-              <rect width="100%" height="100%" fill="white" />
-              <g className="intro-text-group-pattern">
-                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="font-clash-display font-semibold text-[15vw] md:text-[18vw]" fill="black">
-                  FAYIZ
-                </text>
-              </g>
+            {/* The Mask for Layer 2 (Soft wipe transition) */}
+            <linearGradient id="sweep-mask-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="white" />
+              <stop offset="80%" stopColor="white" />
+              <stop offset="100%" stopColor="black" />
+            </linearGradient>
+            <mask id="sweep-mask">
+              <rect className="intro-sweep-mask-rect" width="300%" height="100%" fill="url(#sweep-mask-grad)" x="-200%" />
             </mask>
 
-            {/* Mask to reveal the 3D Canvas (Black = hide canvas, White = show canvas through text) */}
+            {/* Mask to reveal the 3D Canvas through text */}
             <mask id="hero-canvas-mask">
               <rect width="100%" height="100%" fill="black" />
               <g className="intro-text-group-canvas">
@@ -108,32 +116,35 @@ export function IntroSequence({ onReady, isMobile }: IntroSequenceProps) {
             </mask>
           </defs>
 
-          {/* Layer: Dark Background */}
-          <rect width="100%" height="100%" fill="var(--background)" className="intro-bg-solid" />
-
-          {/* Layer: Pattern with cutout text */}
-          <rect 
-            width="100%" 
-            height="100%" 
-            fill="url(#dash-pattern)" 
-            mask="url(#pattern-text-mask)" 
-            filter={!isMobile ? "url(#metaball)" : ""}
-            className="intro-pattern-layer" 
-          />
-
-          {/* Layer: Solid Text (Step 4) */}
-          <g className="intro-text-group-solid opacity-0">
-            <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="font-clash-display font-semibold text-[15vw] md:text-[18vw]" fill="var(--foreground)">
-              FAYIZ
+          {/* Layer 2: Scramble Text & Solid Background (Wiped away by mask to reveal 3D canvas) */}
+          <g mask="url(#sweep-mask)" className="intro-layer-two">
+            <rect width="100%" height="100%" fill="var(--background)" className="intro-bg-solid" />
+            <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="text-[15vw] md:text-[18vw]">
+              {['F', 'A', 'Y', 'I', 'Z'].map((char, i) => (
+                <tspan 
+                  key={i} 
+                  id={`scramble-char-${i}`} 
+                  className="scramble-char font-jetbrains-mono font-medium fill-secondary"
+                  style={{ transition: 'fill 0.15s ease' }}
+                >
+                  {char}
+                </tspan>
+              ))}
             </text>
           </g>
 
-          {/* Layer: Wipe Ribbon (Step 5) */}
-          <rect x="-100%" y="0" width="100%" height="100%" fill="var(--accent)" className="intro-wipe-ribbon" />
+          {/* Layer 3: Light Sweep Visual */}
+          <rect 
+            className="intro-sweep-visual opacity-0" 
+            width="100%" 
+            height="150%" 
+            y="-25%"
+            x="-100%"
+            fill="url(#sweep-gradient)" 
+            filter="url(#sweep-blur)" 
+            transform="skewX(-15)"
+          />
         </svg>
-
-        {/* Decorative Border Frame (Step 4) */}
-        <div className="intro-border-frame absolute inset-4 border border-secondary/20 pointer-events-none opacity-0" />
       </div>
     </>
   );
